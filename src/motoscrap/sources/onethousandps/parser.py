@@ -154,36 +154,102 @@ def _find_bike_root(tree: Any) -> dict[str, Any] | None:
 
 _YEAR_FROM_TITLE = re.compile(r"\b(19|20)\d{2}\b")
 
-_LOCALE_PREFERENCES = ("tr-tr", "tr", "en-gb", "en")
+# Preferred locales used only to pick a stable key for attribute/group names
+# (those drive the normaliser). Values themselves are stored with every locale
+# the source exposes, so downstream consumers can pick their own.
+_KEY_LOCALE_PREFERENCES = ("tr-tr", "tr", "en-gb", "en")
+
+I18N_MARKER = "_i18n"
 
 
-def _translate(value: Any) -> Any:
-    """Pick the locale string out of a translation object, or passthrough."""
-    if isinstance(value, dict) and "translations" in value:
-        translations = value.get("translations") or {}
-        if not isinstance(translations, dict):
-            return None
-        for locale in _LOCALE_PREFERENCES:
-            hit = translations.get(locale)
-            if hit is not None and hit != "":
-                return hit
+def _all_translations(value: Any) -> dict[str, str] | None:
+    """Return every locale string from a 1000ps translation object."""
+    if isinstance(value, dict) and isinstance(value.get("translations"), dict):
+        translations = {
+            str(k): v for k, v in value["translations"].items() if isinstance(v, str) and v != ""
+        }
+        return translations or None
+    return None
+
+
+def _pick_key_locale(translations: dict[str, str]) -> str | None:
+    for locale in _KEY_LOCALE_PREFERENCES:
+        hit = translations.get(locale)
+        if hit:
+            return hit
+    return next(iter(translations.values()), None)
+
+
+def _translation_key(value: Any) -> str | None:
+    if isinstance(value, dict):
+        key = value.get("translationKey")
+        if isinstance(key, str) and key:
+            return key
+    return None
+
+
+def _translate_scalar(value: Any) -> str | None:
+    """Collapse a translation object to a single preferred-locale string."""
+    translations = _all_translations(value)
+    if translations is not None:
+        return _pick_key_locale(translations)
+    if isinstance(value, (str, int, float)) and value != "":
+        return str(value)
+    return None
+
+
+def _extract_value(value_num: Any, value_select: Any) -> Any:
+    """Derive a final attribute value.
+
+    Numbers come back as-is. Categorical values come back as:
+      * a plain string when the source offers no translations for it, or
+      * `{"_i18n": {locale: text, ...}}` when translations are available.
+
+    When multiple translated items are present (multi-select), each locale
+    has them joined with a comma.
+    """
+    if value_num is not None:
+        return value_num
+    if not isinstance(value_select, list) or not value_select:
         return None
-    return value
 
+    locales: set[str] = set()
+    per_item_translations: list[dict[str, str] | None] = []
+    per_item_fallback: list[str | None] = []
+    for item in value_select:
+        translations = _all_translations(item)
+        per_item_translations.append(translations)
+        if translations is not None:
+            locales.update(translations.keys())
+            per_item_fallback.append(None)
+        elif isinstance(item, (str, int, float)) and str(item) != "":
+            per_item_fallback.append(str(item))
+        else:
+            per_item_fallback.append(None)
 
-def _translate_select(value: Any) -> Any:
-    """A valueSelect is a list of translation objects or strings; return a joined str or None."""
-    if value is None:
-        return None
-    if isinstance(value, list):
-        items = [_translate(item) for item in value]
-        items = [str(i) for i in items if i is not None and i != ""]
-        if not items:
+    if locales:
+        merged: dict[str, str] = {}
+        for locale in locales:
+            parts: list[str] = []
+            for translations, fallback in zip(
+                per_item_translations, per_item_fallback, strict=True
+            ):
+                if translations is not None:
+                    picked = translations.get(locale)
+                    if picked:
+                        parts.append(picked)
+                elif fallback is not None:
+                    parts.append(fallback)
+            if parts:
+                merged[locale] = ", ".join(parts)
+        if not merged:
             return None
-        if len(items) == 1:
-            return items[0]
-        return ", ".join(items)
-    return _translate(value)
+        return {I18N_MARKER: merged}
+
+    strings = [s for s in per_item_fallback if s]
+    if not strings:
+        return None
+    return ", ".join(strings)
 
 
 def parse_specs(html: str, *, fallback_year: int | None = None) -> SpecsDTO:
@@ -202,20 +268,22 @@ def parse_specs(html: str, *, fallback_year: int | None = None) -> SpecsDTO:
     technical = root.get("technicalData") or {}
     groups = technical.get("groups") or []
     for group in groups:
-        group_name = _translate(group.get("groupName"))
+        group_name_key = _translate_scalar(group.get("groupName"))
+        group_translation_key = _translation_key(group.get("groupName"))
         entries = group.get("entries") or []
         for entry in entries:
-            attr_name = _translate(entry.get("attributeName"))
-            unit = _translate(entry.get("attributeUnit"))
-            value_num = entry.get("valueNumber")
-            value_select = _translate_select(entry.get("valueSelect"))
-            value = value_num if value_num is not None else value_select
-            if attr_name is None or value is None or value == "":
+            attr_name_key = _translate_scalar(entry.get("attributeName"))
+            attr_translation_key = _translation_key(entry.get("attributeName"))
+            unit = _translate_scalar(entry.get("attributeUnit"))
+            value = _extract_value(entry.get("valueNumber"), entry.get("valueSelect"))
+            if attr_translation_key is None or value is None or value == "":
                 continue
             raw_entries.append(
                 {
-                    "group": group_name,
-                    "attribute": str(attr_name),
+                    "group": group_name_key or "",
+                    "group_key": group_translation_key,
+                    "attribute": attr_name_key or attr_translation_key,
+                    "attribute_key": attr_translation_key,
                     "value": value,
                     "unit": unit,
                 }
@@ -241,8 +309,73 @@ def parse_specs(html: str, *, fallback_year: int | None = None) -> SpecsDTO:
         year=int(year),
         display_name=display_name,
         grouped=grouped,
-        raw={f"{e['group']}::{e['attribute']}": e["value"] for e in raw_entries},
+        raw={str(e["attribute_key"]): e["value"] for e in raw_entries},
     )
+
+
+def _summarise_value_for_raw(value: Any) -> Any:
+    if isinstance(value, dict) and I18N_MARKER in value:
+        return value[I18N_MARKER]
+    return value
+
+
+def merge_specs(primary: SpecsDTO, secondaries: list[SpecsDTO]) -> SpecsDTO:
+    """Merge translations from `secondaries` into `primary`.
+
+    Numeric values and structure come from `primary`. For categorical values
+    (those wrapped in `_i18n`), locale translations from secondaries are added
+    alongside the primary's translations.
+    """
+    merged_grouped: dict[str, dict[str, Any]] = {}
+    for group_key, group_value in primary.grouped.items():
+        merged_group = {k: _deep_copy_value(v) for k, v in group_value.items()}
+        merged_grouped[group_key] = merged_group
+
+    for other in secondaries:
+        for group_key, group_value in other.grouped.items():
+            target_group = merged_grouped.setdefault(group_key, {})
+            for attr_key, other_value in group_value.items():
+                if attr_key not in target_group:
+                    target_group[attr_key] = _deep_copy_value(other_value)
+                    continue
+                target_value = target_group[attr_key]
+                target_group[attr_key] = _merge_value(target_value, other_value)
+
+    merged_raw = {**primary.raw}
+    for other in secondaries:
+        for key, value in other.raw.items():
+            merged_raw.setdefault(key, value)
+
+    return SpecsDTO(
+        year=primary.year,
+        display_name=primary.display_name,
+        grouped=merged_grouped,
+        raw=merged_raw,
+    )
+
+
+def _deep_copy_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: _deep_copy_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_deep_copy_value(v) for v in value]
+    return value
+
+
+def _merge_value(target: Any, other: Any) -> Any:
+    target_is_i18n = isinstance(target, dict) and I18N_MARKER in target
+    other_is_i18n = isinstance(other, dict) and I18N_MARKER in other
+
+    if target_is_i18n and other_is_i18n:
+        merged = dict(target[I18N_MARKER])
+        for locale, text in other[I18N_MARKER].items():
+            merged.setdefault(locale, text)
+        return {I18N_MARKER: merged}
+    if target_is_i18n:
+        return target
+    if other_is_i18n:
+        return other
+    return target
 
 
 def parse_existing_model_years(html: str) -> list[int]:

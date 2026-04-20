@@ -38,7 +38,9 @@ All cached years for a single model.
 
 ## GET /specs?source=1000ps&model_external_id=4952&year=2014
 
-Full normalized specs for one year.
+Full normalized specs for one year. Numeric values are language-agnostic. Categorical values carry every translation the source exposes, wrapped under `_i18n`. Pass `?locale=<bcp47>` to flatten to a single locale.
+
+### Without `locale` (raw shape — all translations)
 
 ```json
 {
@@ -50,35 +52,62 @@ Full normalized specs for one year.
   "display_name": "DUCATI MONSTER 796 - 2014",
   "specs": {
     "engine": {
-      "bore_mm": 88, "stroke_mm": 66, "power_hp": 87, "power_rpm": 8250,
-      "torque_nm": 78, "torque_rpm": 6250, "compression_ratio": 11,
-      "displacement_cc": 803, "cooling": "Hava", "cylinders": "2",
-      "valves_per_cylinder": "2", "valve_train": "Desmodromik",
-      "final_drive": "Zincir"
-    },
-    "suspension": {
-      "front_type": "Baş aşağı teleskopik çatal",
-      "front_brand": "Showa",
-      "rear_type": "Tek şok",
-      "rear_brand": "Showa"
-    },
-    "chassis": { "frame_material": "Çelik", "frame_type": "Borulu" },
-    "brakes_front": { "piston": "Dört piston", "technology": "radyal" },
-    "brakes_rear": { "type": "Disk", "piston": "Çift piston" },
-    "rider_aids": { "systems": "ABS" },
-    "dimensions": {
-      "front_tire_width_mm": 120, "front_tire_aspect_ratio": 70, "front_tire_rim_inch": 17,
-      "rear_tire_width_mm": 180, "rear_tire_aspect_ratio": 55, "rear_tire_rim_inch": 17,
-      "length_mm": 2114, "height_mm": 1079, "wheelbase_mm": 1450,
-      "seat_height_mm": 800, "dry_weight_kg": 167, "curb_weight_kg": 187,
-      "fuel_tank_l": 15, "license_class": "A"
+      "bore_mm": 88, "stroke_mm": 66, "power_hp": 87,
+      "cooling": { "_i18n": { "tr-tr": "Hava", "en": "Air", "de": "Luft", "fr": "Air", "es": "aire", "it": "Aria" } },
+      "valve_train": { "_i18n": { "tr-tr": "Desmodromik", "en": "Desmodromic", "de": "Desmodromik", "fr": "Desmodromique" } }
     }
   },
   "scraped_at": "2026-04-20T09:12:34.567Z"
 }
 ```
 
+### With `?locale=en`
+
+```json
+{
+  "specs": {
+    "engine": {
+      "bore_mm": 88, "stroke_mm": 66, "power_hp": 87,
+      "cooling": "Air",
+      "valve_train": "Desmodromic"
+    }
+  }
+}
+```
+
+### With `?locale=tr`
+
+```json
+{
+  "specs": {
+    "engine": {
+      "bore_mm": 88, "stroke_mm": 66, "power_hp": 87,
+      "cooling": "Hava",
+      "valve_train": "Desmodromik"
+    }
+  }
+}
+```
+
+### Locale fallback chain
+
+The requested locale is looked up in this order:
+
+1. Exact match (`tr-tr` → `tr-tr`).
+2. If the request is a bare language (`tr`), any regional variant present (`tr-tr`).
+3. Language-only form of a regional request (`tr-tr` → `tr`).
+4. Defaults: `en-gb`, `en`, `tr-tr`, `tr`.
+5. The first non-empty translation available.
+
 `404` if motoscrap has never scraped that year — trigger `/refresh` first.
+
+## GET /locales?source=1000ps&model_external_id=4952&year=2014
+
+List the locale codes present in a cached year's translations.
+
+```json
+{ "locales": ["cs-cz", "de", "en", "en-gb", "es", "fr", "hr", "hu", "it", "nl", "pl", "pt", "sk", "sl", "sr", "sv", "tr", "tr-tr"] }
+```
 
 ## GET /search?q=monster&source=1000ps&limit=25
 

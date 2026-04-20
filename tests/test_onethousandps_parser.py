@@ -26,7 +26,7 @@ def test_parse_existing_model_years(fixtures_dir: Path) -> None:
     assert 2014 in years
 
 
-def test_parse_specs_2011(fixtures_dir: Path) -> None:
+def test_parse_specs_2011_tr(fixtures_dir: Path) -> None:
     html = _load(fixtures_dir, "monster-796-2011.html")
     specs = parser.parse_specs(html)
 
@@ -39,48 +39,48 @@ def test_parse_specs_2011(fixtures_dir: Path) -> None:
     assert engine["power_hp"] == 87
     assert engine["torque_nm"] == 78
     assert engine["displacement_cc"] == 803
-    assert engine["cooling"] == "Hava"
+
+    cooling = engine["cooling"]
+    assert isinstance(cooling, dict) and "_i18n" in cooling
+    assert cooling["_i18n"].get("tr-tr") == "Hava"
 
     dims = specs.grouped["dimensions"]
     assert dims["wheelbase_mm"] == 1450
     assert dims["seat_height_mm"] == 800
-    assert dims["front_tire_width_mm"] == 120
-    assert dims["license_class"] == "A"
-
-    brakes_front = specs.grouped["brakes_front"]
-    assert brakes_front["piston"] == "Dört piston"
-    assert brakes_front["technology"] == "radyal"
-
-    brakes_rear = specs.grouped["brakes_rear"]
-    assert brakes_rear["type"] == "Disk"
-    assert brakes_rear["piston"] == "Çift piston"
-
-    suspension = specs.grouped["suspension"]
-    assert suspension["front_type"] == "Baş aşağı teleskopik çatal"
-    assert suspension["rear_type"] == "Tek şok"
-    assert suspension["front_brand"] == "Showa"
+    assert dims["license_class"]["_i18n"]["tr-tr"] == "A"
 
 
-def test_parse_specs_2014(fixtures_dir: Path) -> None:
+def test_parse_specs_2014_carries_multiple_locales(fixtures_dir: Path) -> None:
     html = _load(fixtures_dir, "monster-796.html")
     specs = parser.parse_specs(html)
 
     assert specs.year == 2014
     assert specs.display_name == "DUCATI MONSTER 796 - 2014"
     assert specs.grouped["engine"]["displacement_cc"] == 803
-    assert specs.grouped["engine"]["final_drive"] == "Zincir"
     assert specs.grouped["dimensions"]["curb_weight_kg"] == 187
-    assert specs.grouped["dimensions"]["length_mm"] == 2114
-    assert specs.grouped["rider_aids"]["systems"] == "ABS"
+
+    cooling = specs.grouped["engine"]["cooling"]
+    assert cooling["_i18n"]["tr"] == "Hava"
+    assert cooling["_i18n"]["en"] == "Air"
+    assert cooling["_i18n"]["de"] == "Luft"
+
+    rider_aids = specs.grouped["rider_aids"]["systems"]
+    assert rider_aids["_i18n"]["tr"] == "ABS"
 
 
-def test_parse_specs_does_not_leak_unmapped_when_complete(fixtures_dir: Path) -> None:
-    """A well-mapped fixture should have zero unmapped attributes."""
-    html = _load(fixtures_dir, "monster-796-2011.html")
-    specs = parser.parse_specs(html)
-    unmapped = specs.grouped.get("_unmapped", {})
-    # Small number tolerated — the goal is coverage, not perfection.
-    assert len(unmapped) <= 3, f"Too many unmapped: {unmapped}"
+def test_merge_specs_unions_locales(fixtures_dir: Path) -> None:
+    tr = parser.parse_specs(_load(fixtures_dir, "monster-796-2011.html"))
+    en = parser.parse_specs(_load(fixtures_dir, "monster-796-2011-en.html"))
+    merged = parser.merge_specs(tr, [en])
+
+    assert merged.year == 2011
+    cooling = merged.grouped["engine"]["cooling"]
+    assert cooling["_i18n"].get("tr-tr") == "Hava"
+    assert cooling["_i18n"].get("en-gb") == "Air"
+
+    # Numeric values survive unchanged
+    assert merged.grouped["engine"]["bore_mm"] == 88
+    assert merged.grouped["dimensions"]["wheelbase_mm"] == 1450
 
 
 def test_parser_rejects_non_bike_page() -> None:

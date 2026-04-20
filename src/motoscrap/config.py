@@ -26,7 +26,18 @@ class Settings(BaseSettings):
     http_rate_limit_per_sec: float = Field(default=1.0, alias="HTTP_RATE_LIMIT_PER_SEC")
     http_timeout_seconds: float = Field(default=20.0, alias="HTTP_TIMEOUT_SECONDS")
 
+    scrape_locales: str = Field(
+        default="tr-tr,en-gb",
+        alias="SCRAPE_LOCALES",
+        description="Comma-separated locales to fetch for each model year, merged into _i18n.",
+    )
+
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+
+    @property
+    def scrape_locales_list(self) -> list[str]:
+        parts = [p.strip() for p in self.scrape_locales.split(",")]
+        return [p for p in parts if p]
 
     @property
     def api_key_normalized(self) -> str | None:

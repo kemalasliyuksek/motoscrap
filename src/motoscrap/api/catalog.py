@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from motoscrap import models
 from motoscrap.api.deps import session_dependency
 from motoscrap.schemas import BrandOut, ModelOut, ModelYearOut
+from motoscrap.services.flatten import available_locales, flatten_specs
 
 router = APIRouter(tags=["catalog"])
 
@@ -71,6 +72,11 @@ async def list_models(
 async def list_model_years(
     source: str = Query(...),
     model_external_id: str = Query(...),
+    locale: str | None = Query(
+        default=None,
+        description="BCP-47 locale to flatten translations to, e.g. 'en', 'tr-tr', 'de'. "
+        "Omit to receive every translation wrapped in `_i18n`.",
+    ),
     session: AsyncSession = Depends(session_dependency),
 ) -> list[ModelYearOut]:
     source_row = await _source_row(session, source)
@@ -85,7 +91,7 @@ async def list_model_years(
         .order_by(models.ModelYear.year)
     )
     rows = (await session.execute(stmt)).scalars().all()
-    return [_to_year_out(source, r) for r in rows]
+    return [_to_year_out(source, r, locale) for r in rows]
 
 
 @router.get("/specs", response_model=ModelYearOut)
@@ -93,6 +99,11 @@ async def get_specs(
     source: str = Query(...),
     model_external_id: str = Query(...),
     year: int = Query(...),
+    locale: str | None = Query(
+        default=None,
+        description="BCP-47 locale to flatten translations to, e.g. 'en', 'tr-tr', 'de'. "
+        "Omit to receive every translation wrapped in `_i18n`.",
+    ),
     session: AsyncSession = Depends(session_dependency),
 ) -> ModelYearOut:
     source_row = await _source_row(session, source)
@@ -109,7 +120,30 @@ async def get_specs(
     row = (await session.execute(stmt)).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="Specs not found. Try POST /refresh first.")
-    return _to_year_out(source, row)
+    return _to_year_out(source, row, locale)
+
+
+@router.get("/locales")
+async def list_available_locales(
+    source: str = Query(...),
+    model_external_id: str = Query(...),
+    year: int = Query(...),
+    session: AsyncSession = Depends(session_dependency),
+) -> dict[str, list[str]]:
+    source_row = await _source_row(session, source)
+    stmt = (
+        select(models.ModelYear)
+        .join(models.Model)
+        .where(
+            models.Model.source_id == source_row.id,
+            models.Model.external_id == model_external_id,
+            models.ModelYear.year == year,
+        )
+    )
+    row = (await session.execute(stmt)).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Specs not found. Try POST /refresh first.")
+    return {"locales": available_locales(row.specs)}
 
 
 @router.get("/search", response_model=list[ModelOut])
@@ -147,7 +181,9 @@ async def search_models(
     ]
 
 
-def _to_year_out(source_slug: str, row: models.ModelYear) -> ModelYearOut:
+def _to_year_out(
+    source_slug: str, row: models.ModelYear, locale: str | None = None
+) -> ModelYearOut:
     return ModelYearOut(
         source_slug=source_slug,
         brand_name=row.model.brand.name,
@@ -155,6 +191,6 @@ def _to_year_out(source_slug: str, row: models.ModelYear) -> ModelYearOut:
         model_external_id=row.model.external_id,
         year=row.year,
         display_name=row.display_name,
-        specs=row.specs,
+        specs=flatten_specs(row.specs, locale),
         scraped_at=row.scraped_at,
     )

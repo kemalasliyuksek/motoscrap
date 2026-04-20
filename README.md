@@ -30,7 +30,14 @@ curl -X POST http://localhost:8000/refresh \
      -d '{"source": "1000ps", "scope": "model", "model_external_id": "4952"}'
 ```
 
-Read the result:
+Read the result in a specific language:
+
+```bash
+curl "http://localhost:8000/specs?source=1000ps&model_external_id=4952&year=2014&locale=en" | jq
+curl "http://localhost:8000/specs?source=1000ps&model_external_id=4952&year=2014&locale=tr" | jq
+```
+
+Or omit `locale` to receive every translation wrapped in `_i18n` so your client can choose:
 
 ```bash
 curl "http://localhost:8000/specs?source=1000ps&model_external_id=4952&year=2014" | jq
@@ -88,6 +95,7 @@ All configuration is via environment variables. See [`.env.example`](.env.exampl
 | `HTTP_USER_AGENT` | `motoscrap/<version>` | User-Agent sent to source sites |
 | `HTTP_RATE_LIMIT_PER_SEC` | `1` | Max requests per second per source |
 | `HTTP_TIMEOUT_SECONDS` | `20` | Per-request timeout |
+| `SCRAPE_LOCALES` | `tr-tr,en-gb` | Comma-separated locales fetched per model year. Every one becomes a translation in `_i18n`. |
 | `LOG_LEVEL` | `INFO` | Python logging level |
 
 ## Development
