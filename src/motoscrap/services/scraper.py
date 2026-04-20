@@ -141,7 +141,8 @@ async def scrape_model(
         brand_name = str(meta["brand_name"])
         resolved_model_name = str(meta["model_name"])
         resolved_model_slug = model_slug or slugify(resolved_model_name)
-        years = list(meta["existing_model_years"])
+        raw_years = meta["existing_model_years"]
+        years: list[int] = [int(y) for y in raw_years] if isinstance(raw_years, list) else []
 
         from motoscrap.sources.onethousandps.urls import model_url
 

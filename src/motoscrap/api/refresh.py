@@ -28,16 +28,13 @@ async def trigger_refresh(
     if payload.source not in registry:
         raise HTTPException(status_code=400, detail=f"Unknown source {payload.source!r}")
 
-    if payload.scope == "model":
-        if not payload.model_external_id:
-            raise HTTPException(
-                status_code=400, detail="model_external_id required for scope=model"
-            )
-    elif payload.scope != "model":
+    if payload.scope != "model":
         raise HTTPException(
             status_code=501,
             detail=f"scope={payload.scope!r} is not implemented yet",
         )
+    if not payload.model_external_id:
+        raise HTTPException(status_code=400, detail="model_external_id required for scope=model")
 
     task_id = new_task_id()
     task = models.Task(

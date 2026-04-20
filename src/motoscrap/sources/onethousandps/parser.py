@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterator
 from typing import Any
 
 from selectolax.parser import HTMLParser
@@ -122,7 +123,7 @@ def unflatten(payload: list[Any]) -> Any:
     return resolve(0)
 
 
-def _walk(obj: Any):
+def _walk(obj: Any) -> Iterator[Any]:
     stack = [obj]
     seen: set[int] = set()
     while stack:
