@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1]
+
+### Fixed
+- Initial Alembic migration no longer calls `op.create_index` for columns already declared with `index=True`, which caused `DuplicateTableError: relation "ix_brands_slug" already exists` on a fresh Postgres volume.
+
 ## [0.2.0]
 
 ### Added

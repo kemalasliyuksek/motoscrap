@@ -1,6 +1,6 @@
 [project]
 name = "motoscrap"
-version = "0.1.0"
+version = "0.2.1"
 description = "Self-hostable motorcycle catalog scraper with a clean REST API"
 readme = "README.md"
 license = { text = "MIT" }

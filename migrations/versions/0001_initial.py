@@ -54,7 +54,6 @@ def upgrade() -> None:
         ),
         sa.UniqueConstraint("source_id", "external_id", name="uq_brand_source_external"),
     )
-    op.create_index("ix_brands_slug", "brands", ["slug"])
 
     op.create_table(
         "models",
@@ -80,7 +79,6 @@ def upgrade() -> None:
         ),
         sa.UniqueConstraint("source_id", "external_id", name="uq_model_source_external"),
     )
-    op.create_index("ix_models_slug", "models", ["slug"])
 
     op.create_table(
         "model_years",
@@ -103,7 +101,6 @@ def upgrade() -> None:
         ),
         sa.UniqueConstraint("model_id", "year", name="uq_model_year"),
     )
-    op.create_index("ix_model_years_year", "model_years", ["year"])
 
     op.create_table(
         "tasks",
@@ -127,10 +124,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("tasks")
-    op.drop_index("ix_model_years_year", table_name="model_years")
     op.drop_table("model_years")
-    op.drop_index("ix_models_slug", table_name="models")
     op.drop_table("models")
-    op.drop_index("ix_brands_slug", table_name="brands")
     op.drop_table("brands")
     op.drop_table("sources")
