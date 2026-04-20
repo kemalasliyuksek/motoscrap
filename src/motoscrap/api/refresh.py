@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
@@ -17,7 +17,9 @@ from motoscrap.sources import registry
 router = APIRouter(tags=["refresh"])
 
 
-@router.post("/refresh", status_code=202, response_model=TaskOut, dependencies=[Depends(require_api_key)])
+@router.post(
+    "/refresh", status_code=202, response_model=TaskOut, dependencies=[Depends(require_api_key)]
+)
 async def trigger_refresh(
     payload: RefreshRequest,
     background: BackgroundTasks,
@@ -28,7 +30,9 @@ async def trigger_refresh(
 
     if payload.scope == "model":
         if not payload.model_external_id:
-            raise HTTPException(status_code=400, detail="model_external_id required for scope=model")
+            raise HTTPException(
+                status_code=400, detail="model_external_id required for scope=model"
+            )
     elif payload.scope != "model":
         raise HTTPException(
             status_code=501,
@@ -79,7 +83,7 @@ async def _run_task(task_id: str, source_slug: str, scope: str, params: dict[str
             task = (await session.execute(stmt)).scalar_one_or_none()
             if task is not None:
                 task.status = "failed"
-                task.finished_at = datetime.now(timezone.utc)
+                task.finished_at = datetime.now(UTC)
                 await session.commit()
             raise
 

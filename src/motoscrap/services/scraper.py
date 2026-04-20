@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -101,7 +101,7 @@ async def _upsert_model_year(
         display_name=display_name,
         specs=specs,
         raw_specs=raw_specs,
-        scraped_at=datetime.now(timezone.utc),
+        scraped_at=datetime.now(UTC),
     )
     stmt = stmt.on_conflict_do_update(
         constraint="uq_model_year",
@@ -203,7 +203,7 @@ async def run_refresh_task(
     task_stmt = select(models.Task).where(models.Task.id == task_id)
     task = (await session.execute(task_stmt)).scalar_one()
     task.status = "running"
-    task.started_at = datetime.now(timezone.utc)
+    task.started_at = datetime.now(UTC)
     await session.commit()
 
     try:
@@ -221,7 +221,7 @@ async def run_refresh_task(
         task.status = "failed"
         task.error = str(exc)[:2000]
     finally:
-        task.finished_at = datetime.now(timezone.utc)
+        task.finished_at = datetime.now(UTC)
         await session.commit()
 
 

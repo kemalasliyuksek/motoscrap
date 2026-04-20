@@ -41,16 +41,24 @@ class Source(Base, TimestampMixin):
     base_url: Mapped[str] = mapped_column(String(256), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    brands: Mapped[list[Brand]] = relationship(back_populates="source", cascade="all, delete-orphan")
-    models: Mapped[list[Model]] = relationship(back_populates="source", cascade="all, delete-orphan")
+    brands: Mapped[list[Brand]] = relationship(
+        back_populates="source", cascade="all, delete-orphan"
+    )
+    models: Mapped[list[Model]] = relationship(
+        back_populates="source", cascade="all, delete-orphan"
+    )
 
 
 class Brand(Base, TimestampMixin):
     __tablename__ = "brands"
-    __table_args__ = (UniqueConstraint("source_id", "external_id", name="uq_brand_source_external"),)
+    __table_args__ = (
+        UniqueConstraint("source_id", "external_id", name="uq_brand_source_external"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_id: Mapped[int] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), nullable=False)
+    source_id: Mapped[int] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"), nullable=False
+    )
     external_id: Mapped[str] = mapped_column(String(64), nullable=False)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     slug: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
@@ -61,11 +69,17 @@ class Brand(Base, TimestampMixin):
 
 class Model(Base, TimestampMixin):
     __tablename__ = "models"
-    __table_args__ = (UniqueConstraint("source_id", "external_id", name="uq_model_source_external"),)
+    __table_args__ = (
+        UniqueConstraint("source_id", "external_id", name="uq_model_source_external"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_id: Mapped[int] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), nullable=False)
-    brand_id: Mapped[int] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    source_id: Mapped[int] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"), nullable=False
+    )
+    brand_id: Mapped[int] = mapped_column(
+        ForeignKey("brands.id", ondelete="CASCADE"), nullable=False
+    )
     external_id: Mapped[str] = mapped_column(String(64), nullable=False)
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     slug: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
@@ -83,7 +97,9 @@ class ModelYear(Base, TimestampMixin):
     __table_args__ = (UniqueConstraint("model_id", "year", name="uq_model_year"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    model_id: Mapped[int] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), nullable=False)
+    model_id: Mapped[int] = mapped_column(
+        ForeignKey("models.id", ondelete="CASCADE"), nullable=False
+    )
     year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     display_name: Mapped[str] = mapped_column(String(512), nullable=False)
     specs: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
