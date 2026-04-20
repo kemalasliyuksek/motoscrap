@@ -1,0 +1,88 @@
+[project]
+name = "motoscrap"
+version = "0.1.0"
+description = "Self-hostable motorcycle catalog scraper with a clean REST API"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+authors = [{ name = "Kemal Aslıyüksek" }]
+keywords = ["motorcycle", "scraper", "catalog", "rest-api", "self-hosted"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: FastAPI",
+]
+
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "httpx>=0.27",
+    "selectolax>=0.3.21",
+    "orjson>=3.10",
+    "sqlalchemy[asyncio]>=2.0.35",
+    "asyncpg>=0.29",
+    "alembic>=1.13",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "respx>=0.21",
+    "ruff>=0.7",
+    "mypy>=1.11",
+    "types-orjson",
+]
+
+[project.scripts]
+motoscrap = "motoscrap.cli:app"
+
+[project.urls]
+Repository = "https://github.com/kemalasliyuksek/motoscrap"
+Issues = "https://github.com/kemalasliyuksek/motoscrap/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/motoscrap"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",    # pycodestyle + pyflakes
+    "I",              # isort
+    "UP",             # pyupgrade
+    "B",              # bugbear
+    "C4",             # comprehensions
+    "SIM",            # simplify
+    "RUF",            # ruff-specific
+]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src/motoscrap"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["selectolax.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"

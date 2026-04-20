@@ -1,0 +1,35 @@
+services:
+  motoscrap:
+    build: .
+    image: ghcr.io/kemalasliyuksek/motoscrap:latest
+    container_name: motoscrap
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://motoscrap:motoscrap@postgres:5432/motoscrap
+      MOTOSCRAP_API_KEY: ${MOTOSCRAP_API_KEY:-}
+      HTTP_RATE_LIMIT_PER_SEC: ${HTTP_RATE_LIMIT_PER_SEC:-1}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: motoscrap-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: motoscrap
+      POSTGRES_PASSWORD: motoscrap
+      POSTGRES_DB: motoscrap
+    volumes:
+      - motoscrap_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U motoscrap -d motoscrap"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  motoscrap_data:
